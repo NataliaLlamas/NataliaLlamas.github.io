@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neural Engineering Portfolio</title>
+<!-- EDIT: change the title above to your own name, for example "Ana Lopez · Portfolio".
+     The title is the text people see in the browser tab. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<script>
+  // Remember the visitor's choice of light or dark mode
+  (function () {
+    try {
+      var saved = localStorage.getItem("theme");
+      if (saved === "light" || saved === "dark") document.documentElement.setAttribute("data-theme", saved);
+    } catch (e) {}
+  })();
+</script>
+
+<style>
+  /* Layout: a lab notebook on plum. Text sits in one column, each section hangs
+     from a small label in a left rail, and a live ECG strip runs the full width
+     under the name like paper from a recorder. */
+
+  /* ---------- Colors and fonts: dark plum (the default look) ---------- */
+  :root {
+    --bg: #261226;          /* dark plum, page background */
+    --raise: #321a32;       /* a little lighter plum, for empty slots */
+    --ink: #f8f0f5;         /* white orchid, main text */
+    --muted: #c9b3c4;       /* soft orchid, secondary text */
+    --line: #4a2c49;        /* thin divider lines */
+    --rose: #b57281;        /* Turkish rose, buttons and marks */
+    --rose-text: #e0a5b2;   /* lighter rose, small text and links */
+    --on-rose: #241024;     /* text on a rose button */
+    --strip: #1f0e1f;       /* ECG paper */
+    --grid: #2a1429;        /* 1 mm grid lines */
+    --grid-strong: #3e213c; /* 5 mm grid lines */
+    --trace: #f1d5dc;       /* the ECG line */
+    color-scheme: dark;
+
+    --font-display: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
+    --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+
+  /* ---------- Light mode: white orchid background, plum text ---------- */
+  :root[data-theme="light"] {
+    --bg: #f9f2f6; --raise: #ffffff; --ink: #2d1530; --muted: #6b5068; --line: #e6d5df;
+    --rose: #b57281; --rose-text: #984a5e; --on-rose: #241024;
+    --strip: #fdf8fb; --grid: #f5e6ec; --grid-strong: #e3bfcb; --trace: #3b1f3a;
+    color-scheme: light;
+  }
+
+  /* ---------- Base ---------- */
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--rose-text); text-underline-offset: 3px; }
+  p { margin: 0; max-width: 62ch; }
+  :focus-visible { outline: 2px solid var(--rose-text); outline-offset: 3px; }
+  @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+
+  .page {
+    max-width: 1080px;
+    margin-inline: auto;
+    padding-inline: clamp(16px, 4vw, 40px);
+    padding-block: 20px 48px;
+  }
+
+  /* Small uppercase label style, used in many places */
+  .label {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0;
+  }
+
+  /* ---------- Top bar ---------- */
+  .top {
+    display: flex; flex-wrap: wrap; align-items: center;
+    justify-content: space-between; gap: 12px 24px;
+    padding-block: 8px 20px;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--font-display); font-weight: 700; font-size: 1.1rem;
+    color: var(--ink); text-decoration: none;
+  }
+  .brand svg { color: var(--rose); flex: none; }
+  .nav { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 20px; }
+  .nav a, .theme-btn {
+    font-family: var(--font-mono); font-size: 0.78rem; letter-spacing: 0.06em;
+    text-transform: uppercase; text-decoration: none;
+    color: var(--muted); padding-block: 4px;
+  }
+  .nav a:hover { color: var(--rose-text); }
+  .theme-btn {
+    background: transparent; border: 1px solid var(--line); border-radius: 999px;
+    padding: 5px 12px; cursor: pointer;
+  }
+  .theme-btn:hover { color: var(--ink); border-color: var(--rose); }
+
+  /* ---------- Hero ---------- */
+  .hero { display: grid; gap: 22px; padding-block: clamp(28px, 6vw, 64px) 36px; }
+  .hero .label { color: var(--rose-text); }
+  h1 {
+    margin: 0;
+    font-family: var(--font-display); font-weight: 800;
+    font-size: clamp(2.6rem, 8vw, 5rem);
+    line-height: 1; letter-spacing: -0.02em; text-wrap: balance;
+  }
+  .lead { font-size: clamp(1.05rem, 2vw, 1.25rem); max-width: 54ch; color: var(--muted); }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn {
+    display: inline-block;
+    font-family: var(--font-mono); font-size: 0.85rem; text-decoration: none;
+    padding: 10px 20px; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--ink);
+  }
+  .btn:hover { border-color: var(--rose); }
+  .btn.primary { background: var(--rose); border-color: var(--rose); color: var(--on-rose); font-weight: 500; }
+  .btn.primary:hover { filter: brightness(1.08); }
+
+  /* The ECG paper under the name. Small boxes are 1 mm, large boxes are 5 mm. */
+  .signal { display: grid; gap: 10px; padding-bottom: 56px; }
+  .strip-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; }
+  .strip {
+    height: 140px;
+    border: 1px solid var(--grid-strong);
+    border-radius: 4px;
+    overflow: hidden;
+    background-color: var(--strip);
+    background-image:
+      linear-gradient(to right, var(--grid-strong) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--grid-strong) 1px, transparent 1px),
+      linear-gradient(to right, var(--grid) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+    background-size: 20px 20px, 20px 20px, 4px 4px, 4px 4px;
+  }
+  .strip canvas { display: block; width: 100%; height: 100%; }
+
+  /* ---------- Sections ---------- */
+  .section {
+    display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 16px 40px;
+    padding-block: 52px; border-top: 1px solid var(--line);
+  }
+  .section > .label { padding-top: 0.7em; }
+  .body { display: grid; gap: 28px; min-width: 0; }
+  h2 {
+    margin: 0; max-width: 22ch;
+    font-family: var(--font-display); font-weight: 700;
+    font-size: clamp(1.6rem, 3.6vw, 2.3rem);
+    line-height: 1.1; letter-spacing: -0.01em; text-wrap: balance;
+  }
+  h3, h4 { margin: 0; font-family: var(--font-display); font-weight: 700; line-height: 1.25; text-wrap: balance; }
+  h3 { font-size: 1.25rem; }
+  h4 { font-size: 1.15rem; }
+  .soft { color: var(--muted); }
+
+  /* About */
+  .about { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 24px 36px; align-items: start; }
+  .photo {
+    aspect-ratio: 4 / 5; max-width: 100%;
+    display: grid; place-items: center; text-align: center; padding: 12px;
+    border: 1.5px dashed var(--rose); border-radius: 6px; background: var(--raise);
+    font-family: var(--font-mono); font-size: 0.78rem; color: var(--muted);
+  }
+  img.photo { padding: 0; border-style: solid; object-fit: cover; width: 100%; }
+  .about-text { display: grid; gap: 16px; min-width: 0; }
+  .facts { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 10px 24px; font-size: 0.98rem; }
+  .facts dt { padding-top: 0.35em; }
+  .facts dd { margin: 0; overflow-wrap: anywhere; }
+
+  /* Projects: one block for each type of project */
+  #projects { padding-bottom: 36px; }
+  .type {
+    display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 12px 40px;
+    padding-block: 32px; border-top: 1px solid var(--line);
+  }
+  .type:last-of-type { padding-bottom: 52px; }
+  .type-body { display: grid; gap: 14px; min-width: 0; }
+  .list { list-style: none; margin: 0; padding: 0; display: grid; }
+  .proj {
+    display: grid; grid-template-columns: 84px minmax(0, 1fr) auto; gap: 6px 20px;
+    align-items: baseline; padding-block: 18px; border-top: 1px solid var(--line);
+  }
+  .proj:last-child { padding-bottom: 0; }
+  .proj-main { display: grid; gap: 6px; min-width: 0; }
+  .proj p { color: var(--muted); font-size: 0.98rem; }
+  .proj .tags { font-family: var(--font-mono); font-size: 0.78rem; }
+  .proj .more { font-family: var(--font-mono); font-size: 0.8rem; white-space: nowrap; }
+  .proj .label.current { color: var(--rose-text); }
+  .proj.open h4 { color: var(--muted); font-weight: 500; }
+
+  /* Research interests: 2 x 2 grid */
+  .topics { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 40px; }
+  .topics li { display: grid; gap: 8px; align-content: start; padding-top: 14px; border-top: 2px solid var(--rose); }
+  .topics p { color: var(--muted); font-size: 0.98rem; }
+  .slot {
+    display: grid; gap: 6px; padding: 18px 20px;
+    border: 1.5px dashed var(--rose); border-radius: 6px; background: var(--raise);
+  }
+
+  /* Skills: three short lists */
+  .skills { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px 32px; }
+  .skills ul { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+  .skills li { padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+
+  .foot { border-top: 1px solid var(--line); padding-top: 20px; font-size: 0.85rem; color: var(--muted); }
+
+  /* ---------- Phone layout ---------- */
+  @media (max-width: 760px) {
+    .section, .type { grid-template-columns: 1fr; }
+    .section { padding-block: 40px; }
+    .section > .label { padding-top: 0; }
+    .about { grid-template-columns: 1fr; }
+    .photo { width: 150px; }
+    .skills { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 600px) {
+    .proj { grid-template-columns: 1fr; }
+    .topics { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ================= TOP BAR ================= -->
+  <header class="top">
+    <!-- EDIT: put your name here -->
+    <a class="brand" href="#top" id="top">
+      <svg width="34" height="18" viewBox="0 0 34 18" aria-hidden="true">
+        <path d="M1 11 H9 L11.5 8.5 L14 11 L16 1.5 L18.5 16.5 L20.5 11 H24 L27 8 L30 11 H33" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      </svg>
+      [Your Name]
+    </a>
+    <nav class="nav" aria-label="Sections">
+      <a href="#about">About</a>
+      <a href="#projects">Projects</a>
+      <a href="#research">Research</a>
+      <a href="#skills">Skills</a>
+      <a href="#contact">Contact</a>
+      <button class="theme-btn" type="button" id="themeBtn">Light mode</button>
+    </nav>
+  </header>
+
+  <main>
+
+    <!-- ================= HERO ================= -->
+    <!-- EDIT: your name and one or two sentences about you -->
+    <section class="hero">
+      <p class="label">Neural engineering · Biomedical engineering · NeuroAI</p>
+      <h1>[Your Name]</h1>
+      <p class="lead">I am a student who wants to build devices that help patients. I work on projects that read signals from the body, from the heart to the brain.</p>
+      <div class="actions">
+        <a class="btn primary" href="#projects">See my projects</a>
+        <a class="btn" href="#contact">Contact me</a>
+      </div>
+    </section>
+
+    <div class="signal">
+      <div class="strip" id="strip">
+        <canvas id="ecg" role="img" aria-label="A moving ECG line"></canvas>
+      </div>
+      <div class="strip-head">
+        <p class="label">Simulated ECG from my first project</p>
+        <p class="label">25 mm/s · 10 mm/mV</p>
+      </div>
+    </div>
+
+    <!-- ================= ABOUT ================= -->
+    <!-- EDIT: to add your photo, replace the <div class="photo">...</div> line with
+         <img class="photo" src="photo.jpg" alt="Photo of Your Name">
+         and put photo.jpg in the same folder as this file. -->
+    <section class="section" id="about">
+      <p class="label">About</p>
+      <div class="body">
+        <h2>About me</h2>
+        <div class="about">
+          <div class="photo">Add your photo here</div>
+          <div class="about-text">
+            <p>I am a college junior. I want to become a neural engineer or a biomedical engineer.</p>
+            <p>I am interested in neuroAI: using AI together with signals from the brain and body. I want to use it to build devices that help people, to target drugs better, and to improve the devices used in hospitals.</p>
+            <p>I like working on teams and on hardware. After college, I plan to go to graduate school.</p>
+            <dl class="facts">
+              <dt class="label">School</dt><dd>[Your school]</dd>
+              <dt class="label">Major</dt><dd>[Your major]</dd>
+              <dt class="label">Year</dt><dd>Junior</dd>
+              <dt class="label">Goal</dt><dd>Graduate school in neural or biomedical engineering</dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= PROJECTS ================= -->
+    <!-- HOW TO ADD A PROJECT: copy one <li class="proj"> ... </li> block and paste it
+         inside the list of the right type. Then change the text.
+         HOW TO ADD A TYPE: copy one <section class="type"> ... </section> block. -->
+    <section class="section" id="projects">
+      <p class="label">Projects</p>
+      <div class="body">
+        <h2>Projects by type</h2>
+        <p class="soft">I start with projects I can do on a computer: code and simulation. Hardware comes next.</p>
+      </div>
+    </section>
+
+    <!-- Type 1 -->
+    <section class="type">
+      <h3>Medical devices</h3>
+      <div class="type-body">
+        <p class="soft">How a device measures the body: the signal, the circuit, and the documents behind it.</p>
+        <ul class="list">
+          <li class="proj">
+            <span class="label current">Current</span>
+            <div class="proj-main">
+              <h4>ECG Analyzer</h4>
+              <p>A Python program that loads ECG recordings, filters the signal, finds each heartbeat, and calculates heart rate.</p>
+              <p class="tags">Python · PhysioNet · Signal processing</p>
+            </div>
+            <a class="more" href="ecg-analyzer.html">View project →</a>
+          </li>
+          <li class="proj">
+            <span class="label">Planned</span>
+            <div class="proj-main">
+              <h4>ECG amplifier</h4>
+              <p>Design and simulate the circuit that picks up the small ECG signal from the skin.</p>
+              <p class="tags">LTspice · Analog circuits</p>
+            </div>
+          </li>
+          <li class="proj">
+            <span class="label">Planned</span>
+            <div class="proj-main">
+              <h4>Design history file</h4>
+              <p>Document the ECG project the way medical device teams do, from user needs to testing.</p>
+              <p class="tags">Design controls · Documentation</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Type 2 -->
+    <section class="type">
+      <h3>Surgical robotics</h3>
+      <div class="type-body">
+        <p class="soft">Robots that help surgeons move with more precision.</p>
+        <ul class="list">
+          <li class="proj open">
+            <span class="label">Open</span>
+            <div class="proj-main">
+              <h4>[Your first surgical robotics project]</h4>
+              <p>[One or two sentences: what it does and what you learned.]</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Type 3 -->
+    <section class="type">
+      <h3>Neurotechnology</h3>
+      <div class="type-body">
+        <p class="soft">Brain interfaces and other hardware that reads or sends signals in the nervous system.</p>
+        <ul class="list">
+          <li class="proj open">
+            <span class="label">Open</span>
+            <div class="proj-main">
+              <h4>[Your first neurotechnology project]</h4>
+              <p>[One or two sentences: what it does and what you learned.]</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Type 4 -->
+    <!-- EDIT: check these class projects. Delete the ones you do not want to show. -->
+    <section class="type">
+      <h3>Coursework</h3>
+      <div class="type-body">
+        <p class="soft">Programs from my computer science classes.</p>
+        <ul class="list">
+          <li class="proj">
+            <span class="label">Class</span>
+            <div class="proj-main">
+              <h4>NGrams</h4>
+              <p>A tool to explore how often words are used over time.</p>
+              <p class="tags">Java · Data structures</p>
+            </div>
+          </li>
+          <li class="proj">
+            <span class="label">Class</span>
+            <div class="proj-main">
+              <h4>Percolation</h4>
+              <p>A simulation that tests when a grid of open and blocked cells lets water pass from top to bottom.</p>
+              <p class="tags">Java · Union-find</p>
+            </div>
+          </li>
+          <li class="proj">
+            <span class="label">Class</span>
+            <div class="proj-main">
+              <h4>Particle simulator</h4>
+              <p>A simulation of moving particles.</p>
+              <p class="tags">Java</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ================= RESEARCH ================= -->
+    <section class="section" id="research">
+      <p class="label">Research</p>
+      <div class="body">
+        <h2>What I want to study</h2>
+        <ul class="topics">
+          <li>
+            <h3>Brain interfaces</h3>
+            <p>Devices that read signals from the nervous system or send signals to it.</p>
+          </li>
+          <li>
+            <h3>NeuroAI</h3>
+            <p>Using AI to understand brain signals and to make devices smarter.</p>
+          </li>
+          <li>
+            <h3>Hospital devices</h3>
+            <p>Tools that measure the body safely and reliably in the clinic.</p>
+          </li>
+          <li>
+            <h3>Drug targeting</h3>
+            <p>Getting a drug to the right place in the body.</p>
+          </li>
+        </ul>
+
+        <!-- EDIT: when you join a lab, replace this box with your research experience. -->
+        <div class="slot">
+          <p class="label">Research experience</p>
+          <p>[Add your lab, the question you worked on, and what you did.]</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= SKILLS ================= -->
+    <!-- EDIT: add or remove skills. Each skill is one <li> line. -->
+    <section class="section" id="skills">
+      <p class="label">Skills</p>
+      <div class="body">
+        <h2>Skills I am building</h2>
+        <div class="skills">
+          <div>
+            <p class="label">Programming</p>
+            <ul>
+              <li>Python</li>
+              <li>Java</li>
+              <li>Git</li>
+            </ul>
+          </div>
+          <div>
+            <p class="label">Signals</p>
+            <ul>
+              <li>Filtering</li>
+              <li>Peak detection</li>
+              <li>Heart rate analysis</li>
+            </ul>
+          </div>
+          <div>
+            <p class="label">Next to learn</p>
+            <ul>
+              <li>LTspice circuit simulation</li>
+              <li>Design controls</li>
+              <li>[Add a skill]</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= CONTACT ================= -->
+    <!-- EDIT: replace the text in [brackets]. Examples of real links:
+         <a href="mailto:you@example.com">you@example.com</a>
+         <a href="https://github.com/your-username">github.com/your-username</a> -->
+    <section class="section" id="contact">
+      <p class="label">Contact</p>
+      <div class="body">
+        <h2>Get in touch</h2>
+        <p>I am happy to talk about research, internships, and project ideas.</p>
+        <dl class="facts">
+          <dt class="label">Email</dt><dd>[Your email]</dd>
+          <dt class="label">GitHub</dt><dd>[Link to your GitHub]</dd>
+          <dt class="label">LinkedIn</dt><dd>[Link to your LinkedIn]</dd>
+          <dt class="label">Resume</dt><dd>[Link to your resume]</dd>
+        </dl>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="foot">
+    <p>© 2026 [Your Name]. The ECG line on this page is simulated.</p>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ============ 1. Light and dark mode button ============ */
+  var root = document.documentElement;
+  var themeBtn = document.getElementById("themeBtn");
+
+  function isLight() { return root.getAttribute("data-theme") === "light"; }
+  function showThemeLabel() { themeBtn.textContent = isLight() ? "Dark mode" : "Light mode"; }
+
+  themeBtn.addEventListener("click", function () {
+    var next = isLight() ? "dark" : "light";
+    root.setAttribute("data-theme", next);
+    try { localStorage.setItem("theme", next); } catch (e) {}
+  });
+
+  /* ============ 2. The moving ECG line ============ */
+  var FS = 240;                    // samples per second
+  var PX_PER_MM = 4;               // screen pixels for 1 mm of ECG paper
+  var PX_PER_S = 25 * PX_PER_MM;   // paper speed: 25 mm per second
+  var PX_PER_MV = 10 * PX_PER_MM;  // gain: 10 mm per millivolt
+  var BASELINE_Y = 100;            // where 0 mV sits, in pixels from the top
+  var GAP = 30;                    // blank samples in front of the pen
+  var BPM = 66;                    // heart rate of the simulated signal
+
+  var strip = document.getElementById("strip");
+  var canvas = document.getElementById("ecg");
+  var ctx = canvas.getContext("2d");
+
+  var beats = [];        // time of each heartbeat, in seconds
+  var sampleCount = 0;   // how many samples we have made so far
+
+  // A bell-shaped bump: center mu, width sd, height a
+  function bump(x, mu, sd, a) {
+    var z = (x - mu) / sd;
+    return a * Math.exp(-0.5 * z * z);
+  }
+
+  // One heartbeat = five bumps: P, Q, R, S, T. dt is seconds from the R-peak.
+  function beatShape(dt, rr) {
+    var tT = 0.26 * Math.sqrt(rr);
+    return bump(dt, -0.19, 0.022, 0.14)    // P
+         + bump(dt, -0.028, 0.009, -0.13)  // Q
+         + bump(dt, 0, 0.011, 1.25)        // R (the tall spike)
+         + bump(dt, 0.03, 0.011, -0.28)    // S
+         + bump(dt, tT, 0.04, 0.32);       // T
+  }
+
+  // Make the next sample, in millivolts
+  function nextSample() {
+    var t = sampleCount / FS;
+    sampleCount += 1;
+
+    if (beats.length === 0) beats.push({ t: 0.3, rr: 60 / BPM });
+    while (beats[beats.length - 1].t < t + 1) {
+      var rr = (60 / BPM) * (1 + (Math.random() - 0.5) * 0.06); // small natural change
+      beats.push({ t: beats[beats.length - 1].t + rr, rr: rr });
+    }
+    while (beats.length > 2 && beats[0].t < t - 1) beats.shift();
+
+    var v = 0;
+    for (var i = 0; i < beats.length; i++) {
+      var dt = t - beats[i].t;
+      if (dt > -0.4 && dt < 0.7) v += beatShape(dt, beats[i].rr);
+    }
+    return v;
+  }
+
+  var buf = new Float32Array(0);  // one sample for each position on the strip
+  var head = 0;                   // where the pen is now
+  var W = 0, H = 140;
+
+  function draw() {
+    var n = buf.length;
+    if (n < GAP + 10) return;
+    var color = getComputedStyle(root).getPropertyValue("--trace").trim() || "#f1d5dc";
+    var start = (head + GAP + 1) % n;   // oldest sample that is still shown
+
+    ctx.clearRect(0, 0, W, H);
+    ctx.beginPath();
+    for (var k = 0; k < n - GAP; k++) {
+      var idx = (start + k) % n;
+      var x = idx * PX_PER_S / FS;
+      var y = BASELINE_Y - buf[idx] * PX_PER_MV;
+      if (k === 0 || idx === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.lineWidth = 1.6;
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = color;
+    ctx.stroke();
+  }
+
+  function resize() {
+    var w = Math.max(200, Math.round(strip.clientWidth));
+    if (w === W) return;
+    W = w;
+    H = strip.clientHeight || 140;
+    var dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // Fill the whole strip so the page looks complete right away
+    buf = new Float32Array(Math.floor(W / PX_PER_S * FS));
+    for (var i = 0; i < buf.length; i++) buf[i] = nextSample();
+    head = buf.length - 1;
+    draw();
+  }
+
+  // People who ask their device for less motion get a still line
+  var moving = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var lastTime = performance.now();
+  var owed = 0;  // samples we still need to make
+
+  function frame(now) {
+    var dt = Math.min((now - lastTime) / 1000, 0.1);
+    lastTime = now;
+    if (buf.length > 0) {
+      owed += dt * FS;
+      var steps = Math.floor(owed);
+      owed -= steps;
+      for (var i = 0; i < steps; i++) {
+        head = (head + 1) % buf.length;
+        buf[head] = nextSample();
+      }
+      draw();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // When the theme changes, update the button text and the line color
+  new MutationObserver(function () { showThemeLabel(); draw(); })
+    .observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(strip);
+  window.addEventListener("resize", resize);
+
+  showThemeLabel();
+  resize();
+  if (moving) requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
