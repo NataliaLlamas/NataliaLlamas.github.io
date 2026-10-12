@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ECG Analyzer</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<script>
+  // Use the same light or dark mode the visitor picked on the portfolio page
+  (function () {
+    try {
+      var saved = localStorage.getItem("theme");
+      if (saved === "light" || saved === "dark") document.documentElement.setAttribute("data-theme", saved);
+    } catch (e) {}
+  })();
+</script>
+
+<style>
+  /* Layout: a recorder strip. Text sits in a left-aligned column, the live ECG
+     strip runs the full page width like chart paper, and each section hangs
+     from a small label in a left rail. */
+
+  /* ---------- Colors and fonts: dark plum (the default look) ---------- */
+  :root {
+    --paper: #261226;        /* dark plum, page background */
+    --ink: #f8f0f5;          /* white orchid, main text */
+    --muted: #c9b3c4;        /* secondary text */
+    --line: #4a2c49;         /* thin divider lines */
+    --strip: #1f0e1f;        /* ECG paper */
+    --grid: #2a1429;         /* 1 mm grid lines */
+    --grid-strong: #3e213c;  /* 5 mm grid lines */
+    --trace: #f1d5dc;        /* the ECG line */
+    --accent: #e0a5b2;       /* rose: links and R-peak marks */
+    --code: #371d36;         /* background behind code words */
+    color-scheme: dark;
+
+    --font-display: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
+    --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+
+  /* ---------- Light mode: white orchid background, plum text ---------- */
+  :root[data-theme="light"] {
+    --paper: #f9f2f6; --ink: #2d1530; --muted: #6b5068; --line: #e6d5df;
+    --strip: #fdf8fb; --grid: #f5e6ec; --grid-strong: #e3bfcb;
+    --trace: #3b1f3a; --accent: #984a5e; --code: #f1e4eb;
+    color-scheme: light;
+  }
+
+  /* ---------- Base ---------- */
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); text-underline-offset: 3px; }
+  p { margin: 0; max-width: 62ch; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+
+  .page {
+    max-width: 1080px;
+    margin-inline: auto;
+    padding-inline: clamp(16px, 4vw, 40px);
+    padding-block: 20px 48px;
+  }
+
+  /* Small uppercase label style, used in many places */
+  .label {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0;
+  }
+
+  /* ---------- Top bar ---------- */
+  .top {
+    display: flex; flex-wrap: wrap; align-items: center;
+    justify-content: space-between; gap: 12px 24px;
+    padding-block: 8px 20px;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--font-display); font-weight: 700; font-size: 1.1rem;
+    color: var(--ink); text-decoration: none;
+  }
+  .brand svg { color: var(--accent); flex: none; }
+  .nav { display: flex; flex-wrap: wrap; gap: 6px 20px; }
+  .nav a {
+    font-family: var(--font-mono); font-size: 0.78rem; letter-spacing: 0.06em;
+    text-transform: uppercase; text-decoration: none;
+    color: var(--muted); padding-block: 4px;
+  }
+  .nav a:hover { color: var(--accent); }
+
+  /* ---------- Hero ---------- */
+  .hero { display: grid; gap: 20px; padding-block: clamp(28px, 6vw, 64px) 36px; }
+  .hero .label { color: var(--accent); }
+  h1 {
+    margin: 0; max-width: 14ch;
+    font-family: var(--font-display); font-weight: 800;
+    font-size: clamp(2.3rem, 7vw, 4.4rem);
+    line-height: 1.02; letter-spacing: -0.02em; text-wrap: balance;
+  }
+  .lead { font-size: clamp(1.05rem, 2vw, 1.25rem); max-width: 54ch; color: var(--muted); }
+
+  /* ---------- Live demo ---------- */
+  .demo { display: grid; gap: 16px; padding-block: 0 56px; }
+  .strip-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; }
+
+  /* The ECG paper. Small boxes are 1 mm, large boxes are 5 mm. */
+  .strip {
+    height: 220px;
+    border: 1px solid var(--grid-strong);
+    border-radius: 4px;
+    overflow: hidden;
+    background-color: var(--strip);
+    background-image:
+      linear-gradient(to right, var(--grid-strong) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--grid-strong) 1px, transparent 1px),
+      linear-gradient(to right, var(--grid) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+    background-size: 20px 20px, 20px 20px, 4px 4px, 4px 4px;
+  }
+  .strip canvas { display: block; width: 100%; height: 100%; }
+
+  .readouts {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;
+    padding-bottom: 16px; border-bottom: 1px solid var(--line);
+  }
+  .readout { display: grid; gap: 2px; min-width: 0; }
+  .readout .value {
+    font-family: var(--font-display); font-weight: 700;
+    font-size: clamp(1.7rem, 6vw, 2.8rem); line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .readout .unit { font-family: var(--font-mono); font-size: 0.85rem; font-weight: 400; color: var(--muted); margin-left: 4px; }
+
+  .controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px 32px; }
+  .field { flex: 1 1 220px; min-width: 0; display: grid; gap: 6px; }
+  .field-top { display: flex; justify-content: space-between; gap: 12px; }
+  .field output { font-family: var(--font-mono); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+  input[type="range"] { width: 100%; margin: 0; accent-color: var(--accent); }
+  .toggles { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
+  .toggle { display: flex; align-items: center; gap: 8px; font-size: 0.95rem; cursor: pointer; }
+  .toggle input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
+  .btn {
+    font-family: var(--font-mono); font-size: 0.85rem;
+    padding: 8px 18px; min-width: 84px;
+    border: 1px solid var(--ink); border-radius: 999px;
+    background: transparent; color: var(--ink); cursor: pointer;
+  }
+  .btn:hover { background: var(--ink); color: var(--paper); }
+  .hint { color: var(--muted); font-size: 0.95rem; }
+
+  /* ---------- Sections ---------- */
+  .section {
+    display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 16px 40px;
+    padding-block: 52px; border-top: 1px solid var(--line);
+  }
+  .section > .label { padding-top: 0.7em; }
+  .body { display: grid; gap: 28px; min-width: 0; }
+  h2 {
+    margin: 0; max-width: 22ch;
+    font-family: var(--font-display); font-weight: 700;
+    font-size: clamp(1.6rem, 3.6vw, 2.3rem);
+    line-height: 1.1; letter-spacing: -0.01em; text-wrap: balance;
+  }
+  h3 { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: 1.2rem; line-height: 1.25; }
+  code { font-family: var(--font-mono); font-size: 0.85em; background: var(--code); padding: 2px 6px; border-radius: 3px; }
+
+  /* Method: four steps in a 2 x 2 grid */
+  .steps {
+    list-style: none; margin: 0; padding: 0; counter-reset: step;
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 40px;
+  }
+  .steps li {
+    counter-increment: step;
+    display: grid; gap: 8px; align-content: start;
+    padding-top: 14px; border-top: 2px solid var(--ink);
+  }
+  .steps li::before {
+    content: "Step " counter(step);
+    font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--accent);
+  }
+  .steps p { color: var(--muted); font-size: 0.98rem; }
+  .steps .tool { font-family: var(--font-mono); font-size: 0.8rem; }
+
+  /* Results: empty slots to fill with your own plots */
+  .slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .slot { margin: 0; display: grid; gap: 8px; min-width: 0; }
+  .slot .empty {
+    aspect-ratio: 4 / 3; max-width: 100%;
+    display: grid; place-items: center; text-align: center; padding: 12px;
+    border: 1.5px dashed var(--grid-strong); border-radius: 4px; background: var(--strip);
+    font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted);
+  }
+  .slot img { display: block; width: 100%; border-radius: 4px; }
+  .slot figcaption { font-size: 0.95rem; font-weight: 500; }
+
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; min-width: 480px; font-size: 0.95rem; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  th { font-family: var(--font-mono); font-size: 0.72rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  td { font-variant-numeric: tabular-nums; }
+  tbody tr:last-child td { border-bottom: 0; }
+
+  /* Roadmap */
+  .road { list-style: none; margin: 0; padding: 0; display: grid; }
+  .road li {
+    display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 4px 20px;
+    align-items: baseline; padding-block: 16px; border-top: 1px solid var(--line);
+  }
+  .road li:first-child { border-top: 0; padding-top: 0; }
+  .road li:first-child .label { color: var(--accent); }
+  .road p { grid-column: 2; color: var(--muted); font-size: 0.98rem; }
+
+  /* About */
+  .facts { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 10px 24px; font-size: 0.98rem; }
+  .facts dt { padding-top: 0.35em; }
+  .facts dd { margin: 0; overflow-wrap: anywhere; }
+
+  .foot { border-top: 1px solid var(--line); padding-top: 20px; font-size: 0.85rem; color: var(--muted); }
+
+  /* ---------- Phone layout ---------- */
+  @media (max-width: 720px) {
+    .section { grid-template-columns: 1fr; padding-block: 40px; }
+    .section > .label { padding-top: 0; }
+    .slots { grid-template-columns: 1fr; }
+    .slot .empty { aspect-ratio: 16 / 9; }
+  }
+  @media (max-width: 600px) {
+    .steps { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ================= TOP BAR ================= -->
+  <header class="top">
+    <a class="brand" href="#top" id="top">
+      <svg width="34" height="18" viewBox="0 0 34 18" aria-hidden="true">
+        <path d="M1 11 H9 L11.5 8.5 L14 11 L16 1.5 L18.5 16.5 L20.5 11 H24 L27 8 L30 11 H33" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      </svg>
+      ECG Analyzer
+    </a>
+    <nav class="nav" aria-label="Sections">
+      <a href="index.html">← Portfolio</a>
+      <a href="#demo">Demo</a>
+      <a href="#method">Method</a>
+      <a href="#results">Results</a>
+      <a href="#roadmap">Roadmap</a>
+      <a href="#about">About</a>
+    </nav>
+  </header>
+
+  <main>
+
+    <!-- ================= HERO ================= -->
+    <section class="hero">
+      <p class="label">Python · PhysioNet data · Signal processing</p>
+      <h1>Finding every heartbeat in an ECG signal</h1>
+      <p class="lead">ECG Analyzer is a Python program. It loads ECG recordings from PhysioNet, cleans the signal, marks each heartbeat, and calculates heart rate.</p>
+    </section>
+
+    <!-- ================= LIVE DEMO ================= -->
+    <section class="demo" id="demo" aria-label="Live demo">
+      <div class="strip-head">
+        <p class="label">Simulated ECG, not patient data</p>
+        <p class="label">25 mm/s · 10 mm/mV · large box = 0.2 s × 0.5 mV</p>
+      </div>
+
+      <div class="strip" id="strip">
+        <canvas id="ecg" role="img" aria-label="A moving ECG line with a mark on each detected heartbeat"></canvas>
+      </div>
+
+      <div class="readouts">
+        <div class="readout">
+          <p class="label">Heart rate, measured</p>
+          <div class="value"><span id="outBpm">–</span><span class="unit">bpm</span></div>
+        </div>
+        <div class="readout">
+          <p class="label">Mean RR interval</p>
+          <div class="value"><span id="outRr">–</span><span class="unit">ms</span></div>
+        </div>
+        <div class="readout">
+          <p class="label">Beats in view</p>
+          <div class="value"><span id="outBeats">–</span></div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <div class="field">
+          <div class="field-top">
+            <label class="label" for="rate">Heart rate, set</label>
+            <output id="rateOut" for="rate">72 bpm</output>
+          </div>
+          <input type="range" id="rate" min="40" max="160" step="1" value="72">
+        </div>
+        <div class="field">
+          <div class="field-top">
+            <label class="label" for="noise">Noise</label>
+            <output id="noiseOut" for="noise">40%</output>
+          </div>
+          <input type="range" id="noise" min="0" max="100" step="1" value="40">
+        </div>
+        <div class="toggles">
+          <label class="toggle" for="filterOn"><input type="checkbox" id="filterOn" checked> Filter</label>
+          <label class="toggle" for="peaksOn"><input type="checkbox" id="peaksOn" checked> R-peak marks</label>
+          <button class="btn" type="button" id="playBtn">Pause</button>
+        </div>
+      </div>
+
+      <p class="hint">Try this: set noise to 100%, then turn the filter off. The detector starts to miss beats, and the measured heart rate drops below the set heart rate.</p>
+    </section>
+
+    <!-- ================= METHOD ================= -->
+    <!-- EDIT: change the text and tool names to match what you really did. -->
+    <section class="section" id="method">
+      <p class="label">Method</p>
+      <div class="body">
+        <h2>From raw signal to heart rate in four steps</h2>
+        <ol class="steps">
+          <li>
+            <h3>Load the recording</h3>
+            <p>Read one ECG record from PhysioNet. Each record has the signal and its sampling rate.</p>
+            <p class="tool">Tool: <code>wfdb</code></p>
+          </li>
+          <li>
+            <h3>Filter the signal</h3>
+            <p>Remove slow baseline drift and fast noise, like 60 Hz hum from power lines. A band-pass filter keeps the part where the heartbeat is.</p>
+            <p class="tool">Tool: <code>scipy.signal</code></p>
+          </li>
+          <li>
+            <h3>Detect the R-peaks</h3>
+            <p>The R-peak is the tall spike in each heartbeat. Find each one with a height threshold and a minimum time between beats.</p>
+            <p class="tool">Tool: <code>find_peaks</code></p>
+          </li>
+          <li>
+            <h3>Calculate heart rate</h3>
+            <p>Measure the time between two R-peaks. This is the RR interval. Heart rate in bpm = 60 ÷ RR interval in seconds.</p>
+            <p class="tool">Tool: <code>numpy</code></p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ================= RESULTS ================= -->
+    <!-- EDIT: to add a plot, replace a <div class="empty">...</div> line with
+         <img src="your-plot.png" alt="Short description of the plot"> -->
+    <section class="section" id="results">
+      <p class="label">Results</p>
+      <div class="body">
+        <h2>What the analyzer found</h2>
+        <p>[Write two or three sentences about your results here. Which records did you test? Did the detector find every beat?]</p>
+
+        <div class="slots">
+          <figure class="slot">
+            <div class="empty">Add your plot here</div>
+            <figcaption>Raw signal and filtered signal</figcaption>
+          </figure>
+          <figure class="slot">
+            <div class="empty">Add your plot here</div>
+            <figcaption>Detected R-peaks</figcaption>
+          </figure>
+          <figure class="slot">
+            <div class="empty">Add your plot here</div>
+            <figcaption>Heart rate over time</figcaption>
+          </figure>
+        </div>
+
+        <!-- EDIT: put your own numbers in this table. Copy a <tr> to add a row. -->
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Record</th><th>Beats found</th><th>Mean heart rate</th><th>Notes</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>[record name]</td><td>–</td><td>– bpm</td><td>[your note]</td></tr>
+              <tr><td>[record name]</td><td>–</td><td>– bpm</td><td>[your note]</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= ROADMAP ================= -->
+    <section class="section" id="roadmap">
+      <p class="label">Roadmap</p>
+      <div class="body">
+        <h2>What comes next</h2>
+        <ol class="road">
+          <li>
+            <span class="label">Now</span>
+            <h3>ECG analyzer in Python</h3>
+            <p>Load, filter, detect R-peaks, and calculate heart rate.</p>
+          </li>
+          <li>
+            <span class="label">Next</span>
+            <h3>ECG amplifier in LTspice</h3>
+            <p>Design and simulate the circuit that picks up the ECG signal.</p>
+          </li>
+          <li>
+            <span class="label">Later</span>
+            <h3>Design history file</h3>
+            <p>Document the ECG project the way medical device teams do.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ================= ABOUT ================= -->
+    <!-- EDIT: replace everything in [brackets] with your own details. -->
+    <section class="section" id="about">
+      <p class="label">About</p>
+      <div class="body">
+        <h2>Why I built this</h2>
+        <p>I want to work on medical devices, surgical robotics, and neurotechnology hardware. All of them read small electrical signals from the body. This project teaches me how to clean and measure those signals.</p>
+        <dl class="facts">
+          <dt class="label">Made by</dt><dd>[Your name]</dd>
+          <dt class="label">School</dt><dd>[Your school and major]</dd>
+          <dt class="label">Code</dt><dd>[Link to your GitHub repository]</dd>
+          <dt class="label">Contact</dt><dd>[Your email]</dd>
+        </dl>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="foot">
+    <p>The signal in the demo is simulated. This project is for learning, not for medical use.</p>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ============ 1. Settings ============ */
+  var FS = 240;                    // samples per second
+  var PX_PER_MM = 4;               // screen pixels for 1 mm of ECG paper
+  var PX_PER_S = 25 * PX_PER_MM;   // paper speed: 25 mm per second
+  var PX_PER_MV = 10 * PX_PER_MM;  // gain: 10 mm per millivolt
+  var BASELINE_Y = 140;            // where 0 mV sits, in pixels from the top
+  var GAP = 30;                    // blank samples in front of the pen
+  var EDGE = Math.round(0.15 * FS);// ignore peaks this close to the ends
+
+  /* ============ 2. Page elements ============ */
+  var strip = document.getElementById("strip");
+  var canvas = document.getElementById("ecg");
+  var ctx = canvas.getContext("2d");
+  var rateInput = document.getElementById("rate");
+  var noiseInput = document.getElementById("noise");
+  var filterInput = document.getElementById("filterOn");
+  var peaksInput = document.getElementById("peaksOn");
+  var playBtn = document.getElementById("playBtn");
+  var rateOut = document.getElementById("rateOut");
+  var noiseOut = document.getElementById("noiseOut");
+  var outBpm = document.getElementById("outBpm");
+  var outRr = document.getElementById("outRr");
+  var outBeats = document.getElementById("outBeats");
+
+  /* ============ 3. Make a fake ECG signal ============ */
+  var beats = [];        // time of each heartbeat, in seconds
+  var sampleCount = 0;   // how many samples we have made so far
+
+  // A bell-shaped bump: center mu, width sd, height a
+  function bump(x, mu, sd, a) {
+    var z = (x - mu) / sd;
+    return a * Math.exp(-0.5 * z * z);
+  }
+
+  // One heartbeat = five bumps: P, Q, R, S, T. dt is seconds from the R-peak.
+  function beatShape(dt, rr) {
+    var tT = 0.26 * Math.sqrt(rr);   // the T wave comes later in a slow heart
+    return bump(dt, -0.19, 0.022, 0.14)    // P
+         + bump(dt, -0.028, 0.009, -0.13)  // Q
+         + bump(dt, 0, 0.011, 1.25)        // R (the tall spike)
+         + bump(dt, 0.03, 0.011, -0.28)    // S
+         + bump(dt, tT, 0.04, 0.32);       // T
+  }
+
+  // Keep the list of heartbeats filled up to 1 second ahead of time t
+  function scheduleBeats(t) {
+    var bpm = Number(rateInput.value);
+    if (beats.length === 0) beats.push({ t: 0.3, rr: 60 / bpm });
+    while (beats[beats.length - 1].t < t + 1) {
+      var rr = (60 / bpm) * (1 + (Math.random() - 0.5) * 0.06); // small natural change
+      beats.push({ t: beats[beats.length - 1].t + rr, rr: rr });
+    }
+    while (beats.length > 2 && beats[0].t < t - 1) beats.shift();
+  }
+
+  // Random number, roughly bell-shaped, spread of about 1
+  function randn() {
+    return (Math.random() + Math.random() + Math.random() - 1.5) * 2;
+  }
+
+  // Make the next sample, in millivolts
+  function nextSample() {
+    var t = sampleCount / FS;
+    sampleCount += 1;
+    scheduleBeats(t);
+
+    var v = 0;
+    for (var i = 0; i < beats.length; i++) {
+      var dt = t - beats[i].t;
+      if (dt > -0.4 && dt < 0.7) v += beatShape(dt, beats[i].rr);
+    }
+
+    var n = Number(noiseInput.value) / 100;
+    v += n * 0.45 * Math.sin(2 * Math.PI * 0.33 * t);  // slow baseline drift
+    v += n * 0.12 * Math.sin(2 * Math.PI * 60 * t);    // 60 Hz power line hum
+    v += n * 0.06 * randn();                           // random noise
+    return v;
+  }
+
+  /* ============ 4. Signal processing ============ */
+
+  // Moving average: each point becomes the mean of `win` points around it
+  function movingAverage(x, win) {
+    var n = x.length;
+    var sums = new Array(n + 1);
+    sums[0] = 0;
+    for (var i = 0; i < n; i++) sums[i + 1] = sums[i] + x[i];
+
+    var half = Math.floor(win / 2);
+    var out = new Array(n);
+    for (var j = 0; j < n; j++) {
+      var a = Math.max(0, j - half);
+      var b = Math.min(n, j - half + win);
+      out[j] = (sums[b] - sums[a]) / (b - a);
+    }
+    return out;
+  }
+
+  // Filter: remove slow drift, then smooth away fast noise
+  function filterSignal(x) {
+    var drift = movingAverage(x, Math.round(0.6 * FS)); // the slow part
+    var flat = new Array(x.length);
+    for (var i = 0; i < x.length; i++) flat[i] = x[i] - drift[i];
+    return movingAverage(flat, 4);  // 4 samples at 240 Hz cancels 60 Hz hum
+  }
+
+  // R-peak detector: a local maximum above a threshold,
+  // with at least 0.25 seconds between two beats
+  function findRPeaks(x) {
+    var max = -Infinity;
+    for (var i = 0; i < x.length; i++) if (x[i] > max) max = x[i];
+
+    var threshold = 0.6 * max;
+    var minGap = Math.round(0.25 * FS);
+    var peaks = [];
+    for (var k = 1; k < x.length - 1; k++) {
+      var isPeak = x[k] > threshold && x[k] >= x[k - 1] && x[k] > x[k + 1];
+      if (!isPeak) continue;
+      var last = peaks[peaks.length - 1];
+      if (peaks.length > 0 && k - last < minGap) {
+        if (x[k] > x[last]) peaks[peaks.length - 1] = k;  // keep the taller one
+      } else {
+        peaks.push(k);
+      }
+    }
+    return peaks;
+  }
+
+  /* ============ 5. Drawing ============ */
+  var buf = new Float32Array(0);  // one sample for each position on the strip
+  var head = 0;                   // where the pen is now
+  var W = 0, H = 220;
+  var colors = { trace: "#16203a", accent: "#c2183a" };
+  var drawCount = 0;
+  var lastStats = 0;
+
+  function readColors() {
+    var cs = getComputedStyle(document.documentElement);
+    colors.trace = cs.getPropertyValue("--trace").trim() || colors.trace;
+    colors.accent = cs.getPropertyValue("--accent").trim() || colors.accent;
+  }
+
+  function draw(forceStats) {
+    var n = buf.length;
+    if (n < GAP + 10) return;
+    if (drawCount % 20 === 0) readColors();
+    drawCount += 1;
+
+    // Put the samples in time order: oldest first, newest last
+    var start = (head + GAP + 1) % n;
+    var data = new Array(n - GAP);
+    for (var i = 0; i < data.length; i++) data[i] = buf[(start + i) % n];
+
+    var shown = filterInput.checked ? filterSignal(data) : data;
+    var peaks = findRPeaks(shown);
+
+    // Draw the ECG line
+    ctx.clearRect(0, 0, W, H);
+    ctx.beginPath();
+    for (var k = 0; k < shown.length; k++) {
+      var idx = (start + k) % n;
+      var x = idx * PX_PER_S / FS;
+      var y = BASELINE_Y - shown[k] * PX_PER_MV;
+      if (k === 0 || idx === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.lineWidth = 1.6;
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = colors.trace;
+    ctx.stroke();
+
+    // Draw a small triangle above each R-peak
+    if (peaksInput.checked) {
+      ctx.fillStyle = colors.accent;
+      for (var p = 0; p < peaks.length; p++) {
+        var px = ((start + peaks[p]) % n) * PX_PER_S / FS;
+        var py = Math.max(16, BASELINE_Y - shown[peaks[p]] * PX_PER_MV);
+        ctx.beginPath();
+        ctx.moveTo(px - 4.5, py - 14);
+        ctx.lineTo(px + 4.5, py - 14);
+        ctx.lineTo(px, py - 6);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    // Update the numbers four times per second
+    var now = performance.now();
+    if (forceStats || now - lastStats > 250) {
+      lastStats = now;
+      showStats(peaks, shown.length);
+    }
+  }
+
+  function showStats(peaks, length) {
+    var good = [];
+    for (var i = 0; i < peaks.length; i++) {
+      if (peaks[i] > EDGE && peaks[i] < length - EDGE) good.push(peaks[i]);
+    }
+    outBeats.textContent = String(good.length);
+    if (good.length < 2) {
+      outBpm.textContent = "–";
+      outRr.textContent = "–";
+      return;
+    }
+    var meanRr = (good[good.length - 1] - good[0]) / (good.length - 1) / FS; // seconds
+    outBpm.textContent = String(Math.round(60 / meanRr));
+    outRr.textContent = String(Math.round(meanRr * 1000));
+  }
+
+  /* ============ 6. Size, animation, and controls ============ */
+  function resize() {
+    var w = Math.max(200, Math.round(strip.clientWidth));
+    if (w === W) return;
+    W = w;
+    H = strip.clientHeight || 220;
+    var dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // Fill the whole strip so the page looks complete right away
+    buf = new Float32Array(Math.floor(W / PX_PER_S * FS));
+    for (var i = 0; i < buf.length; i++) buf[i] = nextSample();
+    head = buf.length - 1;
+    draw(true);
+  }
+
+  var running = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var lastTime = performance.now();
+  var owed = 0;  // samples we still need to make
+
+  function frame(now) {
+    var dt = Math.min((now - lastTime) / 1000, 0.1);
+    lastTime = now;
+    if (running && buf.length > 0) {
+      owed += dt * FS;
+      var steps = Math.floor(owed);
+      owed -= steps;
+      for (var i = 0; i < steps; i++) {
+        head = (head + 1) % buf.length;
+        buf[head] = nextSample();
+      }
+      draw(false);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function showLabels() {
+    rateOut.textContent = rateInput.value + " bpm";
+    noiseOut.textContent = noiseInput.value + "%";
+    playBtn.textContent = running ? "Pause" : "Play";
+  }
+
+  rateInput.addEventListener("input", showLabels);
+  noiseInput.addEventListener("input", showLabels);
+  filterInput.addEventListener("change", function () { draw(true); });
+  peaksInput.addEventListener("change", function () { draw(true); });
+  playBtn.addEventListener("click", function () {
+    running = !running;
+    showLabels();
+  });
+
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(strip);
+  window.addEventListener("resize", resize);
+
+  showLabels();
+  resize();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
